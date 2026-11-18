@@ -18,7 +18,7 @@ A tiny, private screen-time widget for Windows 11. It shows **where your laptop 
 | **Peak hours** | "Work peaks 8pm–11pm": the 3-hour window when you do the most of it (in Today view: based on your last 7 days). |
 | **Trends** | Each category shows ▲/▼ and by how much: Today vs your average over the last 7 days at the same time of day, 7D/30D vs the previous 7/30 days. Green when it moves the way you want (more Work, less Entertainment). Appears once there's a week of history (two weeks for 30D). |
 | **Breakdown** | Click a category to slide in every app and site inside it, with real logos. Scroll with the mouse wheel. |
-| **Smart idle detection** | Stops counting 2 minutes after you walk away, but keeps counting while a video plays: in any Chrome tab (YouTube, Drive…) or any app playing sound (VLC, a Zoom call…). Games can require input. |
+| **Smart idle detection** | Stops counting 2 minutes after you walk away, but keeps counting while a video plays: in any Chrome tab (YouTube, Drive…) or any app playing sound (VLC, a Zoom call…). Games can require input. The desktop, taskbar, Start menu and desktop widgets count as "Not tracking", so they never add screen time. |
 | **Widget behaviour** | Drag to move. Right-click for *Always on top*, *Lock position*, *Start with Windows*, *Edit categories*, *Exit*. |
 
 ## Install
@@ -81,6 +81,7 @@ Right-click the widget and choose **Edit categories (config.json)**, or open `da
 - **Only part of a site**: add a path, for example `play.google.com/console`. The most specific rule wins.
 - **Remove**: delete the line. That app or site's past time moves to *Other*; nothing is deleted.
 - **New category**: copy a whole category block and give it a new name and colour.
+- **Ignore something completely**: add it to the top-level `"ignore"` list, for example `"ignore": ["SomeOverlay.exe", "example.com"]`. It's never tracked, and its past time is hidden from all totals (your saved history isn't changed, so removing it from the list brings the time back).
 - **Per-item rules**: any app or site can override `idle_secs` and `count_while_video_plays`. A browser game can use `"idle_secs": 60, "count_while_video_plays": false`, so it only counts while you're actually playing (game sound alone doesn't count).
 
 Categories are applied when the widget draws, so changing them also re-sorts your past history.

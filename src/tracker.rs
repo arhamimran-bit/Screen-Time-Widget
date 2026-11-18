@@ -26,7 +26,8 @@ use windows::Win32::System::Threading::{
 };
 use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
 use windows::Win32::UI::WindowsAndMessaging::{
-    EnumChildWindows, GetClassNameW, GetForegroundWindow, GetWindowThreadProcessId,
+    EnumChildWindows, GetClassNameW, GetForegroundWindow, GetWindowLongW, GetWindowTextLengthW,
+    GetWindowThreadProcessId, GWL_EXSTYLE, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW,
 };
 
 use crate::config::Config;
@@ -86,6 +87,9 @@ pub fn detect(config: &Config, names: &mut HashMap<String, String>) -> Option<Ac
         }
     }
 
+    if config.is_ignored(&key) {
+        return None;
+    }
     let rule = config.rule_for(&key);
     let name = rule.name.or(site_name).unwrap_or_else(|| {
         names.entry(path.clone()).or_insert_with(|| describe(&path, &exe)).clone()
@@ -145,7 +149,7 @@ fn foreground_exe() -> Option<(String, u32, String)> {
             return None;
         }
         let mut pid = window_pid(hwnd);
-        if pid == 0 || pid == GetCurrentProcessId() {
+        if pid == 0 || pid == GetCurrentProcessId() || is_desktop_overlay(hwnd) {
             return None;
         }
         let mut path = exe_path(pid)?;
@@ -164,6 +168,16 @@ fn foreground_exe() -> Option<(String, u32, String)> {
         let n = GetClassNameW(hwnd, &mut class).max(0) as usize;
         Some((path, pid, String::from_utf16_lossy(&class[..n])))
     }
+}
+
+/// Desktop widgets and overlays (clocks, weather, other widget apps) use untitled "tool
+/// windows" that never appear on the taskbar. When you close an app, Windows sometimes hands
+/// focus to one of them. They aren't something you're using, so they count as "Not tracking".
+unsafe fn is_desktop_overlay(hwnd: HWND) -> bool {
+    let ex = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+    let tool = ex & WS_EX_TOOLWINDOW.0 != 0;
+    let app_window = ex & WS_EX_APPWINDOW.0 != 0;
+    tool && !app_window && GetWindowTextLengthW(hwnd) == 0
 }
 
 unsafe extern "system" fn find_real_child(child: HWND, lp: LPARAM) -> BOOL {

@@ -962,6 +962,9 @@ impl App {
         for i in 0..len {
             let Some(day) = self.day_ref(start.add(i as i64)) else { continue };
             for (key, it) in &day.items {
+                if self.config.is_ignored(key) {
+                    continue;
+                }
                 let (cat, name) = rule(key, &self.config);
                 total += it.secs;
                 cats[cat].secs += it.secs;
@@ -985,6 +988,9 @@ impl App {
         for i in 0..prev_len {
             let Some(day) = self.day_ref(prev_start.add(i as i64)) else { continue };
             for (key, it) in &day.items {
+                if self.config.is_ignored(key) {
+                    continue;
+                }
                 let (cat, _) = rule(key, &self.config);
                 prev_cat[cat] += if period == Period::Day {
                     let before: u64 = it.hours.iter().take(now_slot).map(|&s| s as u64).sum();

@@ -14,6 +14,11 @@ const DEFAULT: &str = include_str!("../config.default.json");
 pub struct Config {
     #[serde(default)]
     pub day_starts_at_hour: u32,
+    /// Apps (exe names) or sites (domains) that are never tracked. Their past time is also
+    /// hidden from all totals; the saved day files aren't changed, so removing an entry
+    /// brings it back.
+    #[serde(default)]
+    pub ignore: Vec<String>,
     pub categories: Vec<Category>,
     pub other: Category,
 }
@@ -112,6 +117,19 @@ impl Config {
         Some(format!("site:{host}{}", best.unwrap_or_default()))
     }
 
+    /// Is this "app:x.exe" / "site:host[/path]" key on the ignore list?
+    pub fn is_ignored(&self, key: &str) -> bool {
+        if self.ignore.is_empty() {
+            return false;
+        }
+        if let Some(exe) = key.strip_prefix("app:") {
+            return self.ignore.iter().any(|i| i.trim().eq_ignore_ascii_case(exe));
+        }
+        let Some(site) = key.strip_prefix("site:") else { return false };
+        let host = site.split('/').next().unwrap_or(site);
+        self.ignore.iter().filter_map(|i| util::host_of(i)).any(|d| host == d || host.ends_with(&format!(".{d}")))
+    }
+
     /// The category insights are about: "Work" if it exists, else the first one.
     pub fn focus_cat(&self) -> usize {
         self.categories.iter().position(|c| c.name.eq_ignore_ascii_case("work")).unwrap_or(0)
@@ -173,5 +191,21 @@ impl Config {
             idle_secs: self.other.idle_secs,
             video: self.other.count_while_video_plays,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ignore_list() {
+        let mut c = Config::builtin();
+        c.ignore = vec!["SomeOverlay.exe".into(), "example.com".into()];
+        assert!(c.is_ignored("app:someoverlay.exe"));
+        assert!(c.is_ignored("site:example.com"));
+        assert!(c.is_ignored("site:www2.example.com/path"));
+        assert!(!c.is_ignored("app:code.exe"));
+        assert!(!c.is_ignored("site:notexample.com"));
     }
 }

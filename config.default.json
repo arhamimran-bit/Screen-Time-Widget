@@ -1,6 +1,7 @@
 {
-  "_help": "Categories for the Screen Time Widget. Apps match by .exe name (Task Manager > Details tab shows it). Sites match by domain, and subdomains count too (youtube.com also matches m.youtube.com). Add a path to match only part of a site (play.google.com/console = Play Console, not the Play Store). idle_secs = stop counting after this many seconds with no keyboard/mouse input. count_while_video_plays = keep counting while a video plays, even with no input. goal = more/less: colours trend arrows (green when moving the right way). Anything not listed goes to 'other'. The widget reloads this file a few seconds after you save it.",
+  "_help": "Categories for the Screen Time Widget. Apps match by .exe name (Task Manager > Details tab shows it). Sites match by domain, and subdomains count too (youtube.com also matches m.youtube.com). Add a path to match only part of a site (play.google.com/console = Play Console, not the Play Store). idle_secs = stop counting after this many seconds with no keyboard/mouse input. count_while_video_plays = keep counting while a video plays, even with no input. goal = more/less: colours trend arrows (green when moving the right way). Anything not listed goes to 'other'. ignore = apps (exe) or sites (domain) never to track; their past time is hidden too. The widget reloads this file a few seconds after you save it.",
   "day_starts_at_hour": 0,
+  "ignore": [],
   "categories": [
     {
       "name": "Work",
