@@ -8,6 +8,7 @@
 
 use std::collections::HashMap;
 use std::ffi::c_void;
+use std::sync::Mutex;
 
 use windows::core::{w, Interface, PCWSTR, PWSTR};
 use windows::Win32::Media::Audio::{
@@ -85,10 +86,13 @@ pub fn detect(config: &Config, names: &mut HashMap<String, String>) -> Option<Ac
         }
     }
 
-    let (path, pid, class) = fg?;
+    let Some((path, pid, class)) = fg else {
+        return playing_in_background(config, names); // nothing in front (desktop widget...)
+    };
     let exe = fg_exe.unwrap_or_default();
     if IGNORED.contains(&exe.as_str()) || (exe == "explorer.exe" && SHELL_WINDOW_CLASSES.contains(&class.as_str())) {
-        return None; // desktop, taskbar, Start menu...: "Not tracking"
+        // Desktop, taskbar, Start menu...: "Not tracking", unless a video is still playing.
+        return playing_in_background(config, names);
     }
 
     let mut key = format!("app:{exe}");
@@ -105,7 +109,12 @@ pub fn detect(config: &Config, names: &mut HashMap<String, String>) -> Option<Ac
     }
 
     if config.is_ignored(&key) {
-        return None;
+        return playing_in_background(config, names); // an ignored app is like the empty desktop
+    }
+    if key.starts_with("app:") {
+        if let Ok(mut last) = LAST_APP.lock() {
+            *last = Some((exe.clone(), path.clone(), pid));
+        }
     }
     let rule = config.rule_for(&key);
     let name = rule.name.or(site_name).unwrap_or_else(|| {
@@ -118,6 +127,35 @@ pub fn detect(config: &Config, names: &mut HashMap<String, String>) -> Option<Ac
         || (rule.video && (playing || (!key.starts_with("site:") && app_playing_sound(&exe))));
     let exe_path = key.starts_with("app:").then_some(path);
     Some(Activity { key, name, cat: rule.cat, counting, exe_path, pid, call: false })
+}
+
+/// The last app you used (exe name, path, pid), for `playing_in_background`.
+static LAST_APP: Mutex<Option<(String, String, u32)>> = Mutex::new(None);
+
+/// Nothing real is in front: you clicked the empty desktop, the taskbar, a desktop widget...
+/// If a video or sound is still playing, you're watching/listening to it, so it keeps the time:
+///   - a Chrome tab playing a video (any window, any screen), as reported by the extension, or
+///   - the last app you used, if it's still making sound (VLC, Spotify...).
+/// Paused or silent = "Not tracking", as before. This never takes time away from a real window
+/// in front (VS Code in front + YouTube on the other screen still counts as VS Code).
+fn playing_in_background(config: &Config, names: &mut HashMap<String, String>) -> Option<Activity> {
+    if let Some(url) = server::media_url() {
+        if let Some(key) = config.site_key(&url) {
+            let rule = config.rule_for(&key);
+            if rule.video && !config.is_ignored(&key) {
+                let name = rule.name.or_else(|| util::host_of(&url)).unwrap_or_default();
+                return Some(Activity { key, name, cat: rule.cat, counting: true, exe_path: None, pid: 0, call: false });
+            }
+        }
+    }
+    let (exe, path, pid) = LAST_APP.lock().ok()?.clone()?;
+    let key = format!("app:{exe}");
+    let rule = config.rule_for(&key);
+    if !rule.video || config.is_ignored(&key) || !app_playing_sound(&exe) {
+        return None;
+    }
+    let name = rule.name.unwrap_or_else(|| names.entry(path.clone()).or_insert_with(|| describe(&path, &exe)).clone());
+    Some(Activity { key, name, cat: rule.cat, counting: true, exe_path: Some(path), pid, call: false })
 }
 
 /// The time goes to the call app: Zoom, Discord... or, for a call in Chrome, the site of the tab

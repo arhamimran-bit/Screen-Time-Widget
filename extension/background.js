@@ -81,11 +81,25 @@ async function report() {
       }
     }
   } catch (_) {}
+  // A tab that's playing a video/audio, in any window. When you click the empty desktop, the
+  // widget keeps counting this video instead of "Not tracking". Prefers the tab you were on;
+  // otherwise the shown tab of another window with a video playing, or any tab making sound.
+  let media_url = playing ? url : '';
+  if (!media_url) {
+    try {
+      const media = await getFlags('media');
+      const tabs = await chrome.tabs.query({});
+      const t =
+        tabs.find((t) => t.active && Object.values(media[t.id] || {}).some(Boolean)) ||
+        tabs.find((t) => t.audible);
+      media_url = t?.url || '';
+    } catch (_) {}
+  }
   try {
     const res = await fetch(`${BASE}/state`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-STW': '1' },
-      body: JSON.stringify({ id: await profileId(), url, playing, focused, call_url }),
+      body: JSON.stringify({ id: await profileId(), url, playing, focused, call_url, media_url }),
     });
     // The widget says when it's missing this site's logo.
     if (tab && (await res.text()) === 'need_icon') sendIcon(tab);

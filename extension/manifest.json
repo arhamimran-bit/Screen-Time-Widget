@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Screen Time Widget Bridge",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Tells your local Screen Time Widget which website is open, whether a video is playing or a call is using the mic, and each site's logo. Only talks to 127.0.0.1 (your own laptop).",
   "permissions": ["tabs", "alarms", "storage", "favicon"],
   "host_permissions": ["http://127.0.0.1:47613/*"],

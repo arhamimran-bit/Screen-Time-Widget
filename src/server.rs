@@ -31,6 +31,9 @@ pub struct BrowserState {
     /// URL of a tab (in any window) that's using the microphone: a Meet/Zoom-web call.
     #[serde(default)]
     pub call_url: String,
+    /// URL of a tab (in any window) that's playing a video/audio right now.
+    #[serde(default)]
+    pub media_url: String,
 }
 
 fn yes() -> bool {
@@ -55,6 +58,16 @@ pub fn browser() -> Option<BrowserState> {
 pub fn call_url() -> Option<String> {
     let list = PROFILES.lock().ok()?;
     list.iter().filter(|(s, _)| !s.call_url.is_empty()).max_by_key(|(_, at)| *at).map(|(s, _)| s.call_url.clone())
+}
+
+/// The tab playing a video, from the latest Chrome report. Only trusted if it's fresh: the
+/// extension reports at least every 30s, so an older one means Chrome was closed.
+pub fn media_url() -> Option<String> {
+    let list = PROFILES.lock().ok()?;
+    list.iter()
+        .filter(|(s, at)| !s.media_url.is_empty() && at.elapsed() < Duration::from_secs(70))
+        .max_by_key(|(_, at)| *at)
+        .map(|(s, _)| s.media_url.clone())
 }
 
 fn store(state: BrowserState) {
