@@ -30,8 +30,8 @@ You need [Rust](https://rustup.rs). Any Windows toolchain works. If you don't ha
 ```sh
 rustup toolchain install stable-x86_64-pc-windows-gnu
 rustup default stable-x86_64-pc-windows-gnu
-git clone https://github.com/arhamimran-bit/Screen-Time-Widget-.git
-cd Screen-Time-Widget-
+git clone https://github.com/arhamimran-bit/Screen-Time-Widget.git
+cd Screen-Time-Widget
 cargo build --release
 ```
 
