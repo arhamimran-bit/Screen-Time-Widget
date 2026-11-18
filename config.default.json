@@ -1,0 +1,44 @@
+{
+  "_help": "Categories for the Screen Time Widget. Apps match by .exe name (Task Manager > Details tab shows it). Sites match by domain, and subdomains count too (youtube.com also matches m.youtube.com). Add a path to match only part of a site (play.google.com/console = Play Console, not the Play Store). idle_secs = stop counting after this many seconds with no keyboard/mouse input. count_while_video_plays = keep counting while a video plays, even with no input. goal = more/less: colours trend arrows (green when moving the right way). Anything not listed goes to 'other'. The widget reloads this file a few seconds after you save it.",
+  "day_starts_at_hour": 0,
+  "categories": [
+    {
+      "name": "Work",
+      "color": "#3D8BFF",
+      "icon": "",
+      "goal": "more",
+      "idle_secs": 300,
+      "apps": [
+        { "name": "VS Code", "exe": "Code.exe" }
+      ],
+      "sites": [
+        { "name": "GitHub", "domain": "github.com" },
+        { "name": "Stack Overflow", "domain": "stackoverflow.com" },
+        { "name": "Figma", "domain": "figma.com" },
+        { "name": "Claude", "domain": "claude.ai" },
+        { "name": "ChatGPT", "domain": "chatgpt.com" }
+      ]
+    },
+    {
+      "name": "Entertainment",
+      "color": "#FF9F0A",
+      "icon": "",
+      "goal": "less",
+      "idle_secs": 120,
+      "apps": [],
+      "sites": [
+        { "name": "YouTube", "domain": "youtube.com", "count_while_video_plays": true },
+        { "name": "Netflix", "domain": "netflix.com", "count_while_video_plays": true },
+        { "name": "Reddit", "domain": "reddit.com" },
+        { "name": "X", "domain": "x.com" }
+      ]
+    }
+  ],
+  "other": {
+    "name": "Other",
+    "color": "#8E8E93",
+    "icon": "",
+    "idle_secs": 300,
+    "count_while_video_plays": true
+  }
+}

@@ -1,0 +1,8 @@
+/target
+
+# Your tracked screen time, settings and logos: personal, never commit.
+/data
+
+# Private notes for the AI assistant that helps build this project.
+/memory.md
+/CLAUDE.md

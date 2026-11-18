@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Screen Time Widget Bridge",
+  "version": "1.2.0",
+  "description": "Tells your local Screen Time Widget which website is open, whether a video is playing, and each site's logo. Only talks to 127.0.0.1 (your own laptop).",
+  "permissions": ["tabs", "alarms", "storage", "favicon"],
+  "host_permissions": ["http://127.0.0.1:47613/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}
