@@ -977,8 +977,11 @@ impl App {
             }
         }
 
-        // Previous window per category. In Today view: only up to this time of day ("usual by now").
+        // Previous window per category (for the ▲/▼ arrows) and per hour (for Today's "usually peaks").
+        // In Today view the comparison only counts up to this time of day, so a morning isn't
+        // compared against whole days.
         let mut prev_cat = vec![0u64; n];
+        let mut prev_slot_sum = vec![vec![0u64; n]; 24];
         for i in 0..prev_len {
             let Some(day) = self.day_ref(prev_start.add(i as i64)) else { continue };
             for (key, it) in &day.items {
@@ -989,14 +992,20 @@ impl App {
                 } else {
                     it.secs
                 };
+                for (h, s) in it.hours.iter().take(24).enumerate() {
+                    prev_slot_sum[h][cat] += *s as u64;
+                }
             }
         }
 
         let div = self.counted_days(start, len).max(1);
         let prev_div = self.counted_days(prev_start, prev_len);
+        // Arrows only once there's enough history to be meaningful (the user prefers accurate
+        // arrows over early ones): a full previous week for Today/7D, two weeks for 30D.
+        let min_prev_days = if period == Period::Month { 14 } else { 7 };
         for (i, (c, m)) in cats.iter_mut().zip(merged).enumerate() {
             c.secs /= div;
-            if prev_div > 0 {
+            if prev_div >= min_prev_days {
                 c.trend = Some(c.secs as i64 - (prev_cat[i] / prev_div) as i64);
             }
             c.items = m
@@ -1011,31 +1020,22 @@ impl App {
         // Insight line about Work (or the category whose breakdown is open).
         let focus = if self.target == 1.0 { self.detail_cat } else { self.config.focus_cat() }.min(n - 1);
         let fc = &cats[focus];
-        let (insight, insight_color) = if period == Period::Day {
-            match fc.trend {
-                Some(d) if d.abs() >= 60 => (
-                    format!("{} {} {} vs usual by now", fc.name, if d > 0 { "▲" } else { "▼" }, util::fmt_dur(d.unsigned_abs())),
-                    trend_color(d, fc.goal),
-                ),
-                Some(_) => (format!("{} on par with usual", fc.name), SUB),
-                None => (String::new(), SUB),
-            }
+        // "Work peaks 8pm–11pm": the 3-hour window of the day with the most time in this category.
+        // 7D/30D use the window itself; Today uses your last 7 days ("usually").
+        let hourly: Vec<u64> = if period == Period::Day {
+            prev_slot_sum.iter().map(|row| row[focus] / prev_div.max(1)).collect()
         } else {
-            // The 3-hour window of the day with the most time in this category.
-            let window = |h: usize| (0..3).map(|k| slots[(h + k) % 24][focus] as u64).sum::<u64>();
-            let best = (0..24).max_by_key(|&h| (window(h), std::cmp::Reverse(h))).unwrap_or(0);
-            if window(best) >= 60 {
-                (format!("{} peaks {}–{}", fc.name, hour_label(best as u32), hour_label(((best + 3) % 24) as u32)), SUB)
-            } else {
-                (String::new(), SUB)
-            }
+            slots.iter().map(|row| row[focus] as u64).collect()
         };
-        // Trends on the rows only make sense for whole-day windows, not "so far today".
-        if period == Period::Day {
-            for c in &mut cats {
-                c.trend = None;
-            }
-        }
+        let window = |h: usize| (0..3).map(|k| hourly[(h + k) % 24]).sum::<u64>();
+        let best = (0..24).max_by_key(|&h| (window(h), std::cmp::Reverse(h))).unwrap_or(0);
+        let usually = if period == Period::Day { "usually " } else { "" };
+        let insight = if window(best) >= 60 {
+            format!("{} {usually}peaks {}–{}", fc.name, hour_label(best as u32), hour_label(((best + 3) % 24) as u32))
+        } else {
+            String::new()
+        };
+        let insight_color = SUB;
 
         let y_max = if period == Period::Day {
             3600
