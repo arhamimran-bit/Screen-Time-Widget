@@ -4,11 +4,12 @@
 
 const BASE = 'http://127.0.0.1:47613';
 
-// Which tabs/frames are playing media. Kept in session storage because Chrome stops this
-// background script when it's idle, which would otherwise wipe in-memory data.
-async function getMedia() {
-  const { media = {} } = await chrome.storage.session.get('media');
-  return media;
+// Per tab and frame: is media playing ('media') / is the mic in use ('mic').
+// Kept in session storage because Chrome stops this background script when it's idle,
+// which would otherwise wipe in-memory data.
+async function getFlags(name) {
+  const stored = await chrome.storage.session.get(name);
+  return stored[name] || {};
 }
 
 // Each Chrome profile (work, fun...) runs its own copy of this extension. A random id per
@@ -64,15 +65,27 @@ async function report() {
     tab = win?.tabs?.find((t) => t.active);
     if (tab) {
       url = tab.url || tab.pendingUrl || '';
-      const frames = (await getMedia())[tab.id] || {};
+      const frames = (await getFlags('media'))[tab.id] || {};
       playing = Object.values(frames).some(Boolean) || !!tab.audible;
+    }
+  } catch (_) {}
+  // A tab in any window that's using the microphone (a Meet/Zoom-web call). The widget uses it
+  // while Windows confirms Chrome holds the mic, so the call gets the time on any screen.
+  let call_url = '';
+  try {
+    const mic = await getFlags('mic');
+    for (const [tabId, frames] of Object.entries(mic)) {
+      if (Object.values(frames).some(Boolean)) {
+        call_url = (await chrome.tabs.get(Number(tabId))).url || '';
+        break;
+      }
     }
   } catch (_) {}
   try {
     const res = await fetch(`${BASE}/state`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-STW': '1' },
-      body: JSON.stringify({ id: await profileId(), url, playing, focused }),
+      body: JSON.stringify({ id: await profileId(), url, playing, focused, call_url }),
     });
     // The widget says when it's missing this site's logo.
     if (tab && (await res.text()) === 'need_icon') sendIcon(tab);
@@ -81,13 +94,15 @@ async function report() {
   }
 }
 
+// From content.js: {type:'media', playing} (video/audio) or {type:'mic', on} (call).
 chrome.runtime.onMessage.addListener((msg, sender) => {
-  if (msg?.type !== 'media' || !sender.tab) return;
+  if ((msg?.type !== 'media' && msg?.type !== 'mic') || !sender.tab) return;
   (async () => {
-    const media = await getMedia();
-    const frames = (media[sender.tab.id] ||= {});
-    frames[sender.frameId ?? 0] = !!msg.playing;
-    await chrome.storage.session.set({ media });
+    const name = msg.type;
+    const flags = await getFlags(name);
+    const frames = (flags[sender.tab.id] ||= {});
+    frames[sender.frameId ?? 0] = name === 'mic' ? !!msg.on : !!msg.playing;
+    await chrome.storage.session.set({ [name]: flags });
     report();
   })();
 });
@@ -104,9 +119,12 @@ chrome.tabs.onUpdated.addListener((_id, info) => {
   }
 });
 chrome.tabs.onRemoved.addListener(async (id) => {
-  const media = await getMedia();
-  delete media[id];
-  await chrome.storage.session.set({ media });
+  for (const name of ['media', 'mic']) {
+    const flags = await getFlags(name);
+    delete flags[id];
+    await chrome.storage.session.set({ [name]: flags });
+  }
+  report();
 });
 chrome.windows.onFocusChanged.addListener(report);
 chrome.runtime.onStartup.addListener(report);

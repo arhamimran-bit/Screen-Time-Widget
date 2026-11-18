@@ -59,19 +59,23 @@ pub fn valid_domain(d: &str) -> bool {
 /// Where to get a running process's logo: `shell:AppsFolder\<AppUserModelID>` for packaged
 /// apps, otherwise its exe path.
 pub fn icon_source(pid: u32, exe_path: &str) -> String {
-    unsafe {
-        if let Ok(h) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
-            let mut buf = [0u16; 512];
-            let mut len = buf.len() as u32;
-            let ok = GetApplicationUserModelId(h, &mut len, PWSTR(buf.as_mut_ptr())).is_ok();
-            let _ = CloseHandle(h);
-            if ok && len > 1 {
-                let id = String::from_utf16_lossy(&buf[..len as usize - 1]);
-                return format!("shell:AppsFolder\\{id}");
-            }
-        }
+    match aumid(pid) {
+        Some(id) => format!("shell:AppsFolder\\{id}"),
+        None => exe_path.to_string(),
     }
-    exe_path.to_string()
+}
+
+/// A packaged (Store) app's AppUserModelID, e.g. "5319275A.WhatsAppDesktop_cv1g1gvanyjgm!App".
+/// None for normal desktop apps.
+pub fn aumid(pid: u32) -> Option<String> {
+    unsafe {
+        let h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+        let mut buf = [0u16; 512];
+        let mut len = buf.len() as u32;
+        let ok = GetApplicationUserModelId(h, &mut len, PWSTR(buf.as_mut_ptr())).is_ok();
+        let _ = CloseHandle(h);
+        (ok && len > 1).then(|| String::from_utf16_lossy(&buf[..len as usize - 1]))
+    }
 }
 
 /// For app keys like "app:discord.exe" that have no icon source yet, look for a running

@@ -1136,6 +1136,7 @@ impl App {
         // Live status: what's being tracked right now.
         let (label, dot, label_color) = match (&self.config_error, &self.current) {
             (Some(_), _) => ("config.json error".to_string(), RED, RED),
+            (None, Some(a)) if a.call => (format!("{} · call", a.name), parse_color(&self.config.cat(a.cat).color), TEXT2),
             (None, Some(a)) if a.counting => (a.name.clone(), parse_color(&self.config.cat(a.cat).color), TEXT2),
             (None, Some(a)) => (format!("{} · idle", a.name), SUB, SUB),
             (None, None) => ("Not tracking".to_string(), SUB, SUB),

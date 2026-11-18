@@ -10,6 +10,7 @@
 //!      calls `tracker` to see what's in the foreground and add time to today's totals.
 
 mod autostart;
+mod calls;
 mod config;
 mod dates;
 mod icons;

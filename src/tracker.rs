@@ -31,7 +31,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
 };
 
 use crate::config::Config;
-use crate::{server, util};
+use crate::{calls, server, util};
 
 pub struct Activity {
     pub key: String,
@@ -42,6 +42,8 @@ pub struct Activity {
     /// Full exe path for apps (used to pull out the app's logo).
     pub exe_path: Option<String>,
     pub pid: u32,
+    /// true = counted because a call is using the microphone (see calls.rs).
+    pub call: bool,
 }
 
 /// Foreground processes we never count: lock screen, Start menu, search, notification panels.
@@ -68,8 +70,23 @@ const SHELL_WINDOW_CLASSES: &[&str] = &[
 
 /// `names` caches "C:\...\foo.exe" -> "Foo App" so we read the exe's description only once.
 pub fn detect(config: &Config, names: &mut HashMap<String, String>) -> Option<Activity> {
-    let (path, pid, class) = foreground_exe()?;
-    let exe = path.rsplit(['\\', '/']).next().unwrap_or(&path).to_ascii_lowercase();
+    let fg = foreground_exe();
+    let fg_exe = fg.as_ref().map(|(p, _, _)| p.rsplit(['\\', '/']).next().unwrap_or(p).to_ascii_lowercase());
+    if fg_exe.as_deref() == Some("lockapp.exe") {
+        return None; // laptop locked: nothing counts, not even a call
+    }
+
+    // During a call, the call wins, whichever window or screen you're clicking on.
+    let calls = calls::active();
+    if !calls.is_empty() {
+        let c = calls.iter().find(|c| Some(&c.exe) == fg_exe.as_ref()).unwrap_or(&calls[0]);
+        if let Some(a) = call_activity(config, names, c) {
+            return Some(a);
+        }
+    }
+
+    let (path, pid, class) = fg?;
+    let exe = fg_exe.unwrap_or_default();
     if IGNORED.contains(&exe.as_str()) || (exe == "explorer.exe" && SHELL_WINDOW_CLASSES.contains(&class.as_str())) {
         return None; // desktop, taskbar, Start menu...: "Not tracking"
     }
@@ -100,7 +117,32 @@ pub fn detect(config: &Config, names: &mut HashMap<String, String>) -> Option<Ac
     let counting = idle_secs() < rule.idle_secs
         || (rule.video && (playing || (!key.starts_with("site:") && app_playing_sound(&exe))));
     let exe_path = key.starts_with("app:").then_some(path);
-    Some(Activity { key, name, cat: rule.cat, counting, exe_path, pid })
+    Some(Activity { key, name, cat: rule.cat, counting, exe_path, pid, call: false })
+}
+
+/// The time goes to the call app: Zoom, Discord... or, for a call in Chrome, the site of the tab
+/// that holds the microphone (e.g. meet.google.com, reported by the extension).
+/// Always counting: you're in the call even when just listening.
+fn call_activity(config: &Config, names: &mut HashMap<String, String>, c: &calls::CallApp) -> Option<Activity> {
+    let mut key = format!("app:{}", c.exe);
+    let mut site_name = None;
+    if c.exe == "chrome.exe" {
+        if let Some(url) = server::call_url() {
+            if let Some(site_key) = config.site_key(&url) {
+                site_name = util::host_of(&url);
+                key = site_key;
+            }
+        }
+    }
+    if config.is_ignored(&key) {
+        return None;
+    }
+    let rule = config.rule_for(&key);
+    let name = rule.name.or(site_name).unwrap_or_else(|| {
+        names.entry(c.path.clone()).or_insert_with(|| describe(&c.path, &c.exe)).clone()
+    });
+    let exe_path = key.starts_with("app:").then(|| c.path.clone());
+    Some(Activity { key, name, cat: rule.cat, counting: true, exe_path, pid: c.pid, call: true })
 }
 
 /// Is any process with this exe name currently playing sound? Uses the same per-app audio

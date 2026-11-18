@@ -28,6 +28,9 @@ pub struct BrowserState {
     pub playing: bool,
     #[serde(default = "yes")]
     pub focused: bool,
+    /// URL of a tab (in any window) that's using the microphone: a Meet/Zoom-web call.
+    #[serde(default)]
+    pub call_url: String,
 }
 
 fn yes() -> bool {
@@ -45,6 +48,13 @@ pub fn browser() -> Option<BrowserState> {
         .max_by_key(|(_, at)| *at)
         .or_else(|| list.iter().max_by_key(|(_, at)| *at))
         .map(|(s, _)| s.clone())
+}
+
+/// The tab holding the microphone, from whichever Chrome profile reported one most recently.
+/// Only used while Windows confirms Chrome is actually using the mic.
+pub fn call_url() -> Option<String> {
+    let list = PROFILES.lock().ok()?;
+    list.iter().filter(|(s, _)| !s.call_url.is_empty()).max_by_key(|(_, at)| *at).map(|(s, _)| s.call_url.clone())
 }
 
 fn store(state: BrowserState) {

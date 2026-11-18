@@ -18,6 +18,7 @@ A tiny, private screen-time widget for Windows 11. It shows **where your laptop 
 | **Peak hours** | "Work peaks 8pm–11pm": the 3-hour window when you do the most of it (in Today view: based on your last 7 days). |
 | **Trends** | Each category shows ▲/▼ and by how much: Today vs your average over the last 7 days at the same time of day, 7D/30D vs the previous 7/30 days. Green when it moves the way you want (more Work, less Entertainment). Appears once there's a week of history (two weeks for 30D). |
 | **Breakdown** | Click a category to slide in every app and site inside it, with real logos. Scroll with the mouse wheel. |
+| **Calls win** | With a laptop + monitor, you can be in a call on one screen and click around on the other. While an app is using the microphone (Zoom, Discord, Google Meet in Chrome…, even when muted), the time goes to the call. |
 | **Smart idle detection** | Stops counting 2 minutes after you walk away, but keeps counting while a video plays: in any Chrome tab (YouTube, Drive…) or any app playing sound (VLC, a Zoom call…). Games can require input. The desktop, taskbar, Start menu and desktop widgets count as "Not tracking", so they never add screen time. |
 | **Widget behaviour** | Drag to move. Right-click for *Always on top*, *Lock position*, *Start with Windows*, *Edit categories*, *Exit*. |
 
