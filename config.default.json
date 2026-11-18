@@ -7,7 +7,8 @@
       "color": "#3D8BFF",
       "icon": "",
       "goal": "more",
-      "idle_secs": 300,
+      "idle_secs": 120,
+      "count_while_video_plays": true,
       "apps": [
         { "name": "VS Code", "exe": "Code.exe" }
       ],
@@ -25,10 +26,11 @@
       "icon": "",
       "goal": "less",
       "idle_secs": 120,
+      "count_while_video_plays": true,
       "apps": [],
       "sites": [
-        { "name": "YouTube", "domain": "youtube.com", "count_while_video_plays": true },
-        { "name": "Netflix", "domain": "netflix.com", "count_while_video_plays": true },
+        { "name": "YouTube", "domain": "youtube.com" },
+        { "name": "Netflix", "domain": "netflix.com" },
         { "name": "Reddit", "domain": "reddit.com" },
         { "name": "X", "domain": "x.com" }
       ]
@@ -38,7 +40,7 @@
     "name": "Other",
     "color": "#8E8E93",
     "icon": "",
-    "idle_secs": 300,
+    "idle_secs": 120,
     "count_while_video_plays": true
   }
 }

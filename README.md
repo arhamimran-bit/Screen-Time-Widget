@@ -18,7 +18,7 @@ A tiny, private screen-time widget for Windows 11. It shows **where your laptop 
 | **Insights** | "Work peaks 8pm–11pm", or for today "Work ▲ 40m vs usual by now". |
 | **Trends** | Each category shows ▲/▼ vs the previous 7/30 days: green when it moves the way you want (more Work, less Entertainment). |
 | **Breakdown** | Click a category to slide in every app and site inside it, with real logos. Scroll with the mouse wheel. |
-| **Smart idle detection** | Stops counting when you walk away, but keeps counting while a video plays. Games can require input. |
+| **Smart idle detection** | Stops counting 2 minutes after you walk away, but keeps counting while a video plays: in any Chrome tab (YouTube, Drive…) or any app playing sound (VLC, a Zoom call…). Games can require input. |
 | **Widget behaviour** | Drag to move. Right-click for *Always on top*, *Lock position*, *Start with Windows*, *Edit categories*, *Exit*. |
 
 ## Install
@@ -60,7 +60,8 @@ Right-click the widget and choose **Edit categories (config.json)**, or open `da
       "color": "#3D8BFF",
       "icon": "",               // a glyph from the "Segoe Fluent Icons" font
       "goal": "more",                 // "more" | "less" | "": colours the trend arrows
-      "idle_secs": 300,               // stop counting after 5 min without keyboard/mouse
+      "idle_secs": 120,               // stop counting after 2 min without keyboard/mouse
+      "count_while_video_plays": true, // ...unless a video/audio is playing
       "apps": [
         { "name": "VS Code", "exe": "Code.exe" }
       ],
@@ -70,7 +71,7 @@ Right-click the widget and choose **Edit categories (config.json)**, or open `da
       ]
     }
   ],
-  "other": { "name": "Other", "color": "#8E8E93", "icon": "", "idle_secs": 300 }
+  "other": { "name": "Other", "color": "#8E8E93", "icon": "", "idle_secs": 120 }
 }
 ```
 *(`//` comments are only for this explanation; JSON files can't contain them.)*
@@ -80,7 +81,7 @@ Right-click the widget and choose **Edit categories (config.json)**, or open `da
 - **Only part of a site**: add a path, for example `play.google.com/console`. The most specific rule wins.
 - **Remove**: delete the line. That app or site's past time moves to *Other*; nothing is deleted.
 - **New category**: copy a whole category block and give it a new name and colour.
-- **Per-item rules**: any app or site can override `idle_secs`, and `"count_while_video_plays": true` keeps it counting while a video plays (YouTube, Netflix). A browser game can use a short `idle_secs` like `60`, so it only counts while you're playing.
+- **Per-item rules**: any app or site can override `idle_secs` and `count_while_video_plays`. A browser game can use `"idle_secs": 60, "count_while_video_plays": false`, so it only counts while you're actually playing (game sound alone doesn't count).
 
 Categories are applied when the widget draws, so changing them also re-sorts your past history.
 

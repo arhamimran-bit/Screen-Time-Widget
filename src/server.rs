@@ -126,12 +126,21 @@ fn handle(mut s: TcpStream) -> std::io::Result<()> {
         if !icons::valid_domain(&domain) || body.len() < 8 || &body[1..4] != b"PNG" {
             return respond(&mut s, "400 Bad Request", "");
         }
-        crate::util::write_atomic(&icons::site_icon_path(&domain), body);
+        if !crate::util::write_atomic(&icons::site_icon_path(&domain), body) {
+            return respond(&mut s, "500 Internal Server Error", "");
+        }
         icons::CHANGED.store(true, Ordering::Relaxed);
     } else if let Ok(state) = serde_json::from_slice::<BrowserState>(body) {
+        // Ask the extension for this site's logo whenever we don't have it yet, so a missing
+        // or failed logo fixes itself on the next visit.
+        let need_icon = crate::util::host_of(&state.url)
+            .is_some_and(|h| icons::valid_domain(&h) && !icons::site_icon_path(&h).exists());
         store(state);
+        if need_icon {
+            return respond(&mut s, "200 OK", "need_icon");
+        }
     }
-    respond(&mut s, "204 No Content", "")
+    respond(&mut s, "200 OK", "ok")
 }
 
 fn respond(s: &mut TcpStream, status: &str, body: &str) -> std::io::Result<()> {

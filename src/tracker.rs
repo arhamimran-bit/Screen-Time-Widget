@@ -9,7 +9,12 @@
 use std::collections::HashMap;
 use std::ffi::c_void;
 
-use windows::core::{w, PCWSTR, PWSTR};
+use windows::core::{w, Interface, PCWSTR, PWSTR};
+use windows::Win32::Media::Audio::{
+    eMultimedia, eRender, AudioSessionStateActive, IAudioSessionControl2, IAudioSessionManager2,
+    IMMDeviceEnumerator, MMDeviceEnumerator,
+};
+use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_ALL};
 use windows::Win32::Foundation::{CloseHandle, BOOL, FALSE, HWND, LPARAM, TRUE};
 use windows::Win32::Storage::FileSystem::{
     GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW,
@@ -85,9 +90,40 @@ pub fn detect(config: &Config, names: &mut HashMap<String, String>) -> Option<Ac
     let name = rule.name.or(site_name).unwrap_or_else(|| {
         names.entry(path.clone()).or_insert_with(|| describe(&path, &exe)).clone()
     });
-    let counting = idle_secs() < rule.idle_secs || (rule.video && playing);
+    // Counting = you used keyboard/mouse recently, OR (where the rule allows) a video/audio is
+    // playing: a video in a Chrome tab, or sound from the app in front (VLC, Zoom...).
+    // The sound check only runs once you're past the idle time, so it costs nothing normally.
+    let counting = idle_secs() < rule.idle_secs
+        || (rule.video && (playing || (!key.starts_with("site:") && app_playing_sound(&exe))));
     let exe_path = key.starts_with("app:").then_some(path);
     Some(Activity { key, name, cat: rule.cat, counting, exe_path, pid })
+}
+
+/// Is any process with this exe name currently playing sound? Uses the same per-app audio
+/// sessions that the Windows volume mixer shows. Matching by exe name (not process id) handles
+/// apps that play audio from a helper process.
+fn app_playing_sound(exe: &str) -> bool {
+    unsafe {
+        let Ok(devices) = CoCreateInstance::<_, IMMDeviceEnumerator>(&MMDeviceEnumerator, None, CLSCTX_ALL) else {
+            return false;
+        };
+        let Ok(speaker) = devices.GetDefaultAudioEndpoint(eRender, eMultimedia) else { return false };
+        let Ok(manager) = speaker.Activate::<IAudioSessionManager2>(CLSCTX_ALL, None) else { return false };
+        let Ok(sessions) = manager.GetSessionEnumerator() else { return false };
+        for i in 0..sessions.GetCount().unwrap_or(0) {
+            let Ok(session) = sessions.GetSession(i) else { continue };
+            if session.GetState().ok() != Some(AudioSessionStateActive) {
+                continue;
+            }
+            let Ok(s2) = session.cast::<IAudioSessionControl2>() else { continue };
+            let Ok(pid) = s2.GetProcessId() else { continue };
+            let name = exe_path(pid).map(|p| p.rsplit(['\\', '/']).next().unwrap_or("").to_ascii_lowercase());
+            if name.as_deref() == Some(exe) {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 /// Seconds since the last keyboard or mouse input anywhere on the system.

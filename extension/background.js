@@ -1,6 +1,6 @@
 // Runs in the background of Chrome. Whenever the active tab, its URL, or its video state changes,
-// it sends {url, playing} to the widget at 127.0.0.1. It also sends each site's logo once.
-// Nothing leaves your laptop.
+// it sends {url, playing} to the widget at 127.0.0.1. When the widget answers "need_icon", it also
+// sends that site's logo. Nothing leaves your laptop.
 
 const BASE = 'http://127.0.0.1:47613';
 
@@ -33,29 +33,23 @@ function hostOf(url) {
   }
 }
 
-// Send the site's favicon to the widget once. It comes from Chrome's own favicon cache
+// Send the site's favicon to the widget. It comes from Chrome's own favicon cache
 // (the "favicon" permission), so nothing is downloaded from the internet.
 async function sendIcon(tab) {
   const host = hostOf(tab?.url || '');
-  if (!host || !tab.favIconUrl) return;
-  const { sentIcons = {} } = await chrome.storage.local.get('sentIcons');
-  if (sentIcons[host]) return;
+  if (!host || !tab.favIconUrl) return; // page hasn't got its real icon yet; we'll be asked again
   try {
     const src = new URL(chrome.runtime.getURL('/_favicon/'));
     src.searchParams.set('pageUrl', tab.url);
     src.searchParams.set('size', '32');
     const png = await (await fetch(src)).blob();
-    const res = await fetch(`${BASE}/icon`, {
+    await fetch(`${BASE}/icon`, {
       method: 'POST',
       headers: { 'Content-Type': 'image/png', 'X-STW': '1', 'X-Domain': host },
       body: png,
     });
-    if (res.ok) {
-      sentIcons[host] = 1;
-      await chrome.storage.local.set({ sentIcons });
-    }
   } catch (_) {
-    // Widget not running; try again next time.
+    // Widget not running; it will ask again next time.
   }
 }
 
@@ -75,15 +69,16 @@ async function report() {
     }
   } catch (_) {}
   try {
-    await fetch(`${BASE}/state`, {
+    const res = await fetch(`${BASE}/state`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-STW': '1' },
       body: JSON.stringify({ id: await profileId(), url, playing, focused }),
     });
+    // The widget says when it's missing this site's logo.
+    if (tab && (await res.text()) === 'need_icon') sendIcon(tab);
   } catch (_) {
     // Widget isn't running. That's fine.
   }
-  if (tab) sendIcon(tab);
 }
 
 chrome.runtime.onMessage.addListener((msg, sender) => {
@@ -98,9 +93,15 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
 });
 
 chrome.tabs.onActivated.addListener(report);
-chrome.tabs.onUpdated.addListener((_id, info, tab) => {
-  if (info.url !== undefined || info.audible !== undefined || info.status === 'complete') report();
-  if (info.favIconUrl) sendIcon(tab);
+chrome.tabs.onUpdated.addListener((_id, info) => {
+  if (
+    info.url !== undefined ||
+    info.audible !== undefined ||
+    info.favIconUrl !== undefined ||
+    info.status === 'complete'
+  ) {
+    report();
+  }
 });
 chrome.tabs.onRemoved.addListener(async (id) => {
   const media = await getMedia();

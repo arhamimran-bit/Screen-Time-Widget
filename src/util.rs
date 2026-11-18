@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Rust string -> null-terminated UTF-16, which is what Windows APIs expect.
 pub fn wide(s: &str) -> Vec<u16> {
@@ -20,11 +21,15 @@ pub fn app_dir() -> PathBuf {
 }
 
 /// Write via a temp file + rename, so a crash mid-write never leaves a half-written file.
-pub fn write_atomic(path: &Path, bytes: &[u8]) {
-    let tmp = path.with_extension("tmp");
-    if fs::write(&tmp, bytes).is_ok() {
-        let _ = fs::rename(&tmp, path);
+/// Each write gets its own temp name, so two writes at once can't collide. Returns success.
+pub fn write_atomic(path: &Path, bytes: &[u8]) -> bool {
+    static N: AtomicU64 = AtomicU64::new(0);
+    let tmp = path.with_extension(format!("{}.tmp", N.fetch_add(1, Ordering::Relaxed)));
+    let ok = fs::write(&tmp, bytes).is_ok() && fs::rename(&tmp, path).is_ok();
+    if !ok {
+        let _ = fs::remove_file(&tmp);
     }
+    ok
 }
 
 /// 11520 -> "3h 12m", 300 -> "5m", 20 -> "<1m".
